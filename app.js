@@ -113,6 +113,9 @@ const elements = {
   trafficLight: document.getElementById("trafficLight"),
   countdownValue: document.getElementById("countdownValue"),
   answerBoard: document.getElementById("answerBoard"),
+  answerInput: document.getElementById("answerInput"),
+  answerActions: document.getElementById("answerActions"),
+  submitAnswerButton: document.getElementById("submitAnswerButton"),
   hintText: document.getElementById("hintText"),
   feedbackText: document.getElementById("feedbackText"),
   resultSummary: document.getElementById("resultSummary"),
@@ -165,11 +168,23 @@ function bindEvents() {
   elements.startButton.addEventListener("click", () => {
     elements.startButton.blur();
     startGame();
+    focusAnswerInput({ preventScroll: true });
   });
 
   elements.resetScoresButton.addEventListener("click", () => {
     elements.resetScoresButton.blur();
     resetScores();
+  });
+
+  elements.answerInput.addEventListener("input", handleAnswerInput);
+  elements.answerInput.addEventListener("keydown", handleAnswerInputKeydown);
+
+  elements.submitAnswerButton.addEventListener("click", () => {
+    submitAnswer();
+
+    if (state.mode === "playing") {
+      focusAnswerInput({ preventScroll: true });
+    }
   });
 }
 
@@ -240,6 +255,39 @@ function handleAnswerKey(key) {
   }
 
   return false;
+}
+
+function handleAnswerInput() {
+  const sanitized = elements.answerInput.value.replace(/\D+/g, "").slice(0, 3);
+
+  if (state.mode !== "playing") {
+    if (elements.answerInput.value) {
+      elements.answerInput.value = "";
+    }
+
+    return;
+  }
+
+  if (elements.answerInput.value !== sanitized) {
+    elements.answerInput.value = sanitized;
+  }
+
+  state.answerBuffer = sanitized;
+  clearFeedback();
+  renderGameSurface();
+}
+
+function handleAnswerInputKeydown(event) {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    submitAnswer();
+    return;
+  }
+
+  if (event.key === "Escape") {
+    event.preventDefault();
+    clearAnswerBuffer();
+  }
 }
 
 function appendDigit(digit) {
@@ -394,6 +442,7 @@ function beginRound() {
 
   startTimer();
   render();
+  focusAnswerInput({ preventScroll: true });
 }
 
 function startTimer() {
@@ -546,6 +595,7 @@ function finishGame(reason) {
   state.answerBuffer = "";
 
   render();
+  blurAnswerInput();
 }
 
 function resetScores() {
@@ -566,6 +616,7 @@ function resetScores() {
   }
 
   render();
+  blurAnswerInput();
 }
 
 function render() {
@@ -590,21 +641,20 @@ function renderControls() {
 function renderGameSurface() {
   const question = state.questions[state.questionIndex];
   const hasAnswer = Boolean(state.answerBuffer);
-  const showCountdownPanel = renderCountdownPanel();
+  renderCountdownPanel();
 
   elements.feedbackText.textContent = state.feedbackText;
   elements.feedbackText.className = `feedback${state.feedbackTone ? ` ${state.feedbackTone}` : ""}`;
-
-  elements.answerBoard.hidden = state.mode === "countdown" && state.prestartPhase !== "preview";
+  elements.answerActions.hidden = state.mode !== "playing";
+  elements.submitAnswerButton.disabled = state.mode !== "playing";
 
   if (state.mode === "countdown") {
     if (state.prestartPhase === "green") {
       elements.modePill.textContent = "Grün";
       elements.questionLabel.textContent = "Ampelstart";
       elements.questionText.textContent = "\u00A0";
-      elements.answerBoard.textContent = "–";
-      elements.answerBoard.classList.add("placeholder");
-      elements.hintText.textContent = "Die grüne Ampel bleibt kurz sichtbar, dann kommt die erste Aufgabe.";
+      setAnswerBoardValue("", { placeholder: true, editable: true });
+      elements.hintText.textContent = "Die grüne Ampel bleibt kurz sichtbar. Auf Handy oder Tablet bleibt das Zahlenfeld direkt bereit.";
       return;
     }
 
@@ -612,18 +662,16 @@ function renderGameSurface() {
       elements.modePill.textContent = "Achtung";
       elements.questionLabel.textContent = "Erste Aufgabe";
       elements.questionText.textContent = `${question.a} × ${question.b}`;
-      elements.answerBoard.textContent = "–";
-      elements.answerBoard.classList.add("placeholder");
-      elements.hintText.textContent = "Noch eine halbe Sekunde merken, dann startet die Zeit.";
+      setAnswerBoardValue("", { placeholder: true, editable: true });
+      elements.hintText.textContent = "Noch eine halbe Sekunde merken, dann startet die Zeit. Das Antwortfeld ist schon aktiv.";
       return;
     }
 
     elements.modePill.textContent = "Startet gleich";
     elements.questionLabel.textContent = "Ampelstart";
     elements.questionText.textContent = "\u00A0";
-    elements.answerBoard.textContent = "–";
-    elements.answerBoard.classList.add("placeholder");
-    elements.hintText.textContent = "Kurz warten: Erst kommt Grün, dann kurz die erste Aufgabe, dann startet die Zeit.";
+    setAnswerBoardValue("", { placeholder: true, editable: true });
+    elements.hintText.textContent = "Kurz warten: Erst kommt Grün, dann kurz die erste Aufgabe, dann startet die Zeit. Auf Handy oder Tablet ist die Zahlentastatur jetzt schon nutzbar.";
     return;
   }
 
@@ -631,32 +679,25 @@ function renderGameSurface() {
     elements.modePill.textContent = "Läuft";
     elements.questionLabel.textContent = `Aufgabe ${state.questionIndex + 1} von ${SETTINGS.totalQuestions} · noch ${formatSeconds(getRemainingSeconds(), 1)} · ${state.errors} Fehler`;
     elements.questionText.textContent = `${question.a} × ${question.b}`;
-    elements.answerBoard.textContent = hasAnswer ? state.answerBuffer : "–";
-    elements.answerBoard.classList.toggle("placeholder", !hasAnswer);
-    elements.hintText.textContent = showCountdownPanel
-      ? "Antwort direkt tippen – Backspace korrigiert, Enter bestätigt."
-      : "Antwort direkt tippen – Backspace korrigiert, Enter bestätigt.";
+    setAnswerBoardValue(state.answerBuffer, { placeholder: !hasAnswer, editable: true });
+    elements.hintText.textContent = "Antwort direkt tippen – Rücktaste korrigiert, Prüfen oder Enter bestätigt.";
     return;
   }
 
   if (state.mode === "finished" && state.lastResult) {
     elements.modePill.textContent = state.lastResult.reason === "timeout" ? "Zeit um" : "Fertig";
-    elements.questionLabel.textContent = `${state.lastResult.mistakes} Fehler · ${state.lastResult.unanswered} offen · Enter startet neu`;
+    elements.questionLabel.textContent = `${state.lastResult.mistakes} Fehler · ${state.lastResult.unanswered} offen · Enter oder Los geht's startet neu`;
     elements.questionText.textContent = `${state.playerName}, stark gespielt!`;
-    elements.answerBoard.hidden = false;
-    elements.answerBoard.textContent = formatSeconds(state.lastResult.finalTime);
-    elements.answerBoard.classList.remove("placeholder");
-    elements.hintText.textContent = "Enter startet die nächste Runde wieder mit kurzem Rennstart.";
+    setAnswerBoardValue(formatSeconds(state.lastResult.finalTime), { placeholder: false, editable: false });
+    elements.hintText.textContent = "Enter oder Los geht's startet die nächste Runde wieder mit kurzem Rennstart.";
     return;
   }
 
   elements.modePill.textContent = "Bereit";
   elements.questionLabel.textContent = "10 Aufgaben · 90 Sekunden · +5 Sekunden pro Fehler";
-  elements.questionText.textContent = "Drücke Enter für die nächste Runde.";
-  elements.answerBoard.hidden = false;
-  elements.answerBoard.textContent = "–";
-  elements.answerBoard.classList.add("placeholder");
-  elements.hintText.textContent = "Vor jeder Runde gibt es einen kurzen Rennstart mit Ampel und Startsignal.";
+  elements.questionText.textContent = "Drücke Enter oder tippe auf Los geht's.";
+  setAnswerBoardValue("", { placeholder: true, editable: false });
+  elements.hintText.textContent = "Vor jeder Runde gibt es einen kurzen Rennstart mit Ampel und Startsignal. Auf Handy oder Tablet öffnet ein Tipp ins Antwortfeld die Zahlentastatur.";
 }
 
 function renderCountdownPanel() {
@@ -1328,6 +1369,38 @@ function centerGameSurface() {
       inline: "nearest",
     });
   });
+}
+
+function setAnswerBoardValue(value, { placeholder = false, editable = false } = {}) {
+  elements.answerBoard.hidden = false;
+  elements.answerBoard.classList.toggle("placeholder", placeholder);
+  elements.answerInput.readOnly = !editable;
+  elements.answerInput.placeholder = placeholder ? "–" : "";
+
+  if (elements.answerInput.value !== value) {
+    elements.answerInput.value = value;
+  }
+}
+
+function focusAnswerInput({ preventScroll = false } = {}) {
+  if (state.mode !== "playing" && state.mode !== "countdown") {
+    return;
+  }
+
+  try {
+    elements.answerInput.focus({ preventScroll });
+  } catch {
+    elements.answerInput.focus();
+  }
+
+  if (typeof elements.answerInput.setSelectionRange === "function") {
+    const caretPosition = elements.answerInput.value.length;
+    elements.answerInput.setSelectionRange(caretPosition, caretPosition);
+  }
+}
+
+function blurAnswerInput() {
+  elements.answerInput.blur();
 }
 
 function clearFeedback() {

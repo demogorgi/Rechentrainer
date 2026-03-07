@@ -39,7 +39,7 @@
         </div>
 
         <p class="controls-copy">
-          Während der Runde: <strong>Ziffern tippen</strong> · <strong>Enter</strong> prüft · <strong>Backspace</strong> löscht · <strong>Esc</strong> leert alles.
+          Während der Runde: <strong>Ziffern tippen</strong> · <strong>Enter oder Prüfen</strong> bestätigt · <strong>Backspace</strong> löscht.
           Jede Runde bringt dich ein Stück weiter.
         </p>
       </div>
@@ -62,11 +62,33 @@
             <div class="countdown-value" id="countdownValue">3</div>
           </div>
 
-          <h2 class="question-text" id="questionText">Drücke Enter für die nächste Runde.</h2>
+          <h2 class="question-text" id="questionText">Drücke Enter oder tippe auf Los geht's.</h2>
 
-          <div class="answer-board placeholder" id="answerBoard" aria-live="polite">–</div>
+          <div class="answer-board placeholder" id="answerBoard" aria-live="polite">
+            <label class="sr-only" for="answerInput">Antwort</label>
+            <input
+              id="answerInput"
+              class="answer-input"
+              type="text"
+              inputmode="numeric"
+              pattern="[0-9]*"
+              enterkeyhint="done"
+              maxlength="3"
+              autocomplete="off"
+              autocorrect="off"
+              autocapitalize="off"
+              spellcheck="false"
+              placeholder="–"
+              aria-label="Antwort eingeben"
+              readonly
+            >
+          </div>
 
-          <p class="hint" id="hintText">Der Cursor muss nicht in einem Feld stehen. Während der Runde werden Tasten überall auf der Seite erkannt.</p>
+          <div class="answer-actions" id="answerActions" hidden>
+            <button id="submitAnswerButton" class="primary answer-action" type="button">Prüfen</button>
+          </div>
+
+          <p class="hint" id="hintText">Auf Handy oder Tablet ins Antwortfeld tippen – dann öffnet sich die Zahlentastatur.</p>
           <p class="feedback" id="feedbackText" role="status" aria-live="polite"></p>
         </div>
 
