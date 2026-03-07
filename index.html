@@ -14,12 +14,18 @@
   <div class="app-shell">
     <section class="panel intro-panel">
       <div class="intro-copy">
-        <p class="eyebrow">GitHub Pages · statisch · ohne Backend</p>
+        <p class="eyebrow">Mathe-Boost · schnell · spielerisch</p>
         <h1>Kleines Einmaleins</h1>
         <p class="lead">
-          Antworten laufen direkt über die Tastatur oder das Ziffernfeld.
-          Während der Runde gibt es bewusst kein Eingabefeld für die Lösung.
+          Kurze Runden, direktes Lob und sichtbare Fortschritte.
+          Die App soll Lust machen, sicherer und schneller zu werden.
         </p>
+
+        <div class="hero-tags" aria-label="Stärken der App">
+          <span class="hero-tag">⚡ Schnell starten</span>
+          <span class="hero-tag">🌟 Viel Lob</span>
+          <span class="hero-tag">🏁 Bestzeiten knacken</span>
+        </div>
       </div>
 
       <div class="intro-actions">
@@ -36,12 +42,13 @@
         </label>
 
         <div class="button-row">
-          <button id="startButton" class="primary" type="button">Runde starten</button>
+          <button id="startButton" class="primary" type="button">Los geht's</button>
           <button id="resetScoresButton" class="secondary" type="button">Zeiten zurücksetzen</button>
         </div>
 
         <p class="controls-copy">
           Während der Runde: <strong>Ziffern tippen</strong> · <strong>Enter</strong> prüft · <strong>Backspace</strong> löscht · <strong>Esc</strong> leert alles.
+          Jede Runde bringt dich ein Stück weiter.
         </p>
       </div>
     </section>
@@ -82,36 +89,47 @@
           </article>
         </div>
 
+        <section class="motivation-strip" aria-label="Motivation und Fortschritt">
+          <div class="progress-track" aria-hidden="true">
+            <div class="progress-fill" id="progressFill"></div>
+          </div>
+
+          <div class="motivation-card">
+            <span class="motivation-kicker" id="motivationKicker">Bereit für die nächste Mission?</span>
+            <strong class="motivation-text" id="motivationText">Sammle 10 richtige Antworten und jag deine Bestzeit.</strong>
+          </div>
+        </section>
+
         <div class="game-surface">
-          <span class="mode-pill" id="modePill">Bereit</span>
+          <div class="surface-topline">
+            <span class="mode-pill" id="modePill">Bereit</span>
+            <span class="streak-pill" id="streakPill">Serie 0</span>
+          </div>
           <p class="question-label" id="questionLabel">10 Aufgaben · 90 Sekunden · +5 Sekunden pro Fehler</p>
           <h2 class="question-text" id="questionText">Drücke Enter für die nächste Runde.</h2>
+
+          <div class="countdown-panel" id="countdownPanel" hidden aria-live="assertive" aria-atomic="true">
+            <div class="traffic-light" id="trafficLight" data-phase="red" aria-hidden="true">
+              <span class="traffic-bulb red"></span>
+              <span class="traffic-bulb yellow"></span>
+              <span class="traffic-bulb green"></span>
+            </div>
+            <div class="countdown-value" id="countdownValue">3</div>
+          </div>
 
           <div class="answer-board placeholder" id="answerBoard" aria-live="polite">–</div>
 
           <p class="hint" id="hintText">Der Cursor muss nicht in einem Feld stehen. Während der Runde werden Tasten überall auf der Seite erkannt.</p>
           <p class="feedback" id="feedbackText" role="status" aria-live="polite"></p>
-
-          <div class="keypad" id="keypad" aria-label="Ziffernfeld für Touch-Eingabe">
-            <button type="button" class="keypad-key" data-key="7">7</button>
-            <button type="button" class="keypad-key" data-key="8">8</button>
-            <button type="button" class="keypad-key" data-key="9">9</button>
-            <button type="button" class="keypad-key" data-key="4">4</button>
-            <button type="button" class="keypad-key" data-key="5">5</button>
-            <button type="button" class="keypad-key" data-key="6">6</button>
-            <button type="button" class="keypad-key" data-key="1">1</button>
-            <button type="button" class="keypad-key" data-key="2">2</button>
-            <button type="button" class="keypad-key" data-key="3">3</button>
-            <button type="button" class="keypad-key utility" data-key="clear">C</button>
-            <button type="button" class="keypad-key" data-key="0">0</button>
-            <button type="button" class="keypad-key confirm" data-key="enter">OK</button>
-          </div>
         </div>
 
         <section class="result-summary" id="resultSummary" hidden>
           <div class="result-header">
-            <h3>Letzte Runde</h3>
-            <p id="resultMessage"></p>
+            <div class="result-copy">
+              <h3>Letzte Runde</h3>
+              <p id="resultMessage"></p>
+            </div>
+            <span class="reward-badge" id="rewardBadge">🌟 Stark gemacht</span>
           </div>
 
           <div class="result-grid">
@@ -141,9 +159,15 @@
       <aside class="panel sidebar">
         <section class="stack-section" id="bestenliste">
           <div class="section-header">
-            <h2>Top 10</h2>
-            <span>alle gespeicherten Zeiten</span>
+            <div class="section-heading">
+              <h2>Top 10</h2>
+              <span>alle gespeicherten Zeiten</span>
+            </div>
+            <button id="toggleChartButton" class="secondary section-action" type="button" aria-expanded="false" aria-controls="chartPanel">
+              Diagramm anzeigen
+            </button>
           </div>
+          <div class="chart-panel" id="chartPanel" hidden></div>
           <ol class="ranking-list" id="topList"></ol>
         </section>
 
