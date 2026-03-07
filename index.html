@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Rechentrainer – Kleines Einmaleins</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
@@ -14,18 +15,9 @@
   <div class="app-shell">
     <section class="panel intro-panel">
       <div class="intro-copy">
-        <p class="eyebrow">Mathe-Boost · schnell · spielerisch</p>
+        <p class="eyebrow">Rechentrainer</p>
         <h1>Kleines Einmaleins</h1>
-        <p class="lead">
-          Kurze Runden, direktes Lob und sichtbare Fortschritte.
-          Die App soll Lust machen, sicherer und schneller zu werden.
-        </p>
-
-        <div class="hero-tags" aria-label="Stärken der App">
-          <span class="hero-tag">⚡ Schnell starten</span>
-          <span class="hero-tag">🌟 Viel Lob</span>
-          <span class="hero-tag">🏁 Bestzeiten knacken</span>
-        </div>
+        <p class="lead">Name eingeben, starten, rechnen.</p>
       </div>
 
       <div class="intro-actions">
@@ -57,54 +49,8 @@
       <section class="panel game-panel" aria-labelledby="spielbereich-title">
         <div class="sr-only" id="spielbereich-title">Spielbereich</div>
 
-        <div class="stats-grid">
-          <article class="stat-card">
-            <span class="stat-label">Spieler</span>
-            <strong class="stat-value" id="playerStat">Gast</strong>
-          </article>
-
-          <article class="stat-card">
-            <span class="stat-label">Aufgabe</span>
-            <strong class="stat-value" id="progressStat">0 / 10</strong>
-          </article>
-
-          <article class="stat-card">
-            <span class="stat-label">Zeit übrig</span>
-            <strong class="stat-value" id="timeStat">90,0 s</strong>
-          </article>
-
-          <article class="stat-card">
-            <span class="stat-label">Fehler</span>
-            <strong class="stat-value" id="errorsStat">0</strong>
-          </article>
-
-          <article class="stat-card">
-            <span class="stat-label">Absolute Bestzeit</span>
-            <strong class="stat-value" id="overallBestStat">–</strong>
-          </article>
-
-          <article class="stat-card">
-            <span class="stat-label">Deine Bestzeit</span>
-            <strong class="stat-value" id="personalBestStat">–</strong>
-          </article>
-        </div>
-
-        <section class="motivation-strip" aria-label="Motivation und Fortschritt">
-          <div class="progress-track" aria-hidden="true">
-            <div class="progress-fill" id="progressFill"></div>
-          </div>
-
-          <div class="motivation-card">
-            <span class="motivation-kicker" id="motivationKicker">Bereit für die nächste Mission?</span>
-            <strong class="motivation-text" id="motivationText">Sammle 10 richtige Antworten und jag deine Bestzeit.</strong>
-          </div>
-        </section>
-
         <div class="game-surface" id="gameSurface">
-          <div class="surface-topline">
-            <span class="mode-pill" id="modePill">Bereit</span>
-            <span class="streak-pill" id="streakPill">Serie 0</span>
-          </div>
+          <span class="mode-pill" id="modePill">Bereit</span>
           <p class="question-label" id="questionLabel">10 Aufgaben · 90 Sekunden · +5 Sekunden pro Fehler</p>
           <h2 class="question-text" id="questionText">Drücke Enter für die nächste Runde.</h2>
 
@@ -163,11 +109,10 @@
               <h2>Bestenliste</h2>
               <span>die schnellsten Zeiten insgesamt</span>
             </div>
-            <button id="toggleChartButton" class="secondary section-action" type="button" aria-expanded="false" aria-controls="chartPanel">
-              Diagramm anzeigen
+            <button id="toggleChartButton" class="secondary section-action" type="button" aria-expanded="false" aria-controls="chartModal">
+              Diagramm
             </button>
           </div>
-          <div class="chart-panel" id="chartPanel" hidden></div>
           <ol class="ranking-list" id="topList"></ol>
         </section>
 
@@ -180,6 +125,16 @@
         </section>
       </aside>
     </main>
+
+    <div class="modal" id="chartModal" hidden>
+      <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="chartModalTitle">
+        <div class="modal-header">
+          <h2 id="chartModalTitle">Bestenliste als Diagramm</h2>
+          <button id="closeChartButton" class="secondary modal-close" type="button">Schließen</button>
+        </div>
+        <div class="chart-panel chart-modal-content" id="chartModalContent"></div>
+      </div>
+    </div>
 
     <p class="storage-note">
       Hinweis: Auf GitHub Pages werden neue Ergebnisse im Browser dieses Geräts gespeichert.

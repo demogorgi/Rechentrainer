@@ -8,7 +8,8 @@ const SETTINGS = Object.freeze({
   maxFactor: 9,
   countdownSeconds: 3,
   countdownStepMs: 800,
-  goFlashMs: 600,
+  greenLightMs: 500,
+  questionPreviewMs: 500,
   chartEntries: 10,
 });
 
@@ -84,14 +85,13 @@ const state = {
   startedAt: 0,
   finishedAt: 0,
   timerId: null,
+  prestartPhase: "countdown",
   countdownValue: SETTINGS.countdownSeconds,
   countdownTimeoutId: null,
-  goFlashTimerId: null,
-  goFlashUntil: 0,
   feedbackText: "",
   feedbackTone: "",
   lastResult: null,
-  chartOpen: false,
+  chartModalOpen: false,
   audioContext: null,
   activeTones: [],
 };
@@ -100,17 +100,7 @@ const elements = {
   playerNameInput: document.getElementById("playerNameInput"),
   startButton: document.getElementById("startButton"),
   resetScoresButton: document.getElementById("resetScoresButton"),
-  playerStat: document.getElementById("playerStat"),
-  progressStat: document.getElementById("progressStat"),
-  timeStat: document.getElementById("timeStat"),
-  errorsStat: document.getElementById("errorsStat"),
-  overallBestStat: document.getElementById("overallBestStat"),
-  personalBestStat: document.getElementById("personalBestStat"),
-  progressFill: document.getElementById("progressFill"),
-  motivationKicker: document.getElementById("motivationKicker"),
-  motivationText: document.getElementById("motivationText"),
   modePill: document.getElementById("modePill"),
-  streakPill: document.getElementById("streakPill"),
   gameSurface: document.getElementById("gameSurface"),
   questionLabel: document.getElementById("questionLabel"),
   questionText: document.getElementById("questionText"),
@@ -129,7 +119,9 @@ const elements = {
   totalTimeResult: document.getElementById("totalTimeResult"),
   topList: document.getElementById("topList"),
   toggleChartButton: document.getElementById("toggleChartButton"),
-  chartPanel: document.getElementById("chartPanel"),
+  chartModal: document.getElementById("chartModal"),
+  chartModalContent: document.getElementById("chartModalContent"),
+  closeChartButton: document.getElementById("closeChartButton"),
   personalList: document.getElementById("personalList"),
   personalSectionLabel: document.getElementById("personalSectionLabel"),
 };
@@ -163,7 +155,8 @@ function bindEvents() {
       removeStoredPlayerName();
     }
 
-    renderStats();
+    renderGameSurface();
+    renderResultSummary();
     renderRankings();
   });
 
@@ -178,14 +171,33 @@ function bindEvents() {
   });
 
   elements.toggleChartButton.addEventListener("click", () => {
-    state.chartOpen = !state.chartOpen;
     elements.toggleChartButton.blur();
-    renderChartPanel();
+    openChartModal();
+  });
+
+  elements.closeChartButton.addEventListener("click", () => {
+    closeChartModal();
+  });
+
+  elements.chartModal.addEventListener("click", (event) => {
+    if (event.target === elements.chartModal) {
+      closeChartModal();
+    }
   });
 }
 
 function handleGlobalKeydown(event) {
   if (event.metaKey || event.ctrlKey || event.altKey) {
+    return;
+  }
+
+  if (state.chartModalOpen) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      closeChartModal();
+    }
+
     return;
   }
 
@@ -287,6 +299,7 @@ function startGame() {
 
   clearTimer();
   clearCountdown();
+  closeChartModal({ restoreFocus: false });
 
   state.playerName = normalizeName(elements.playerNameInput.value);
   elements.playerNameInput.value = state.playerName === "Gast" ? "" : state.playerName;
@@ -301,10 +314,10 @@ function startGame() {
   state.answerBuffer = "";
   state.startedAt = 0;
   state.finishedAt = 0;
+  state.prestartPhase = "countdown";
   state.countdownValue = SETTINGS.countdownSeconds;
   state.feedbackText = "Achte auf die Ampel – bei Grün startet dein Mathe-Run.";
   state.feedbackTone = "";
-  state.goFlashUntil = 0;
 
   elements.playerNameInput.blur();
   centerGameSurface();
@@ -332,11 +345,12 @@ function createQuestions() {
 
 function startCountdown() {
   clearCountdown();
+  state.prestartPhase = "countdown";
   tickCountdown(SETTINGS.countdownSeconds);
 }
 
 function tickCountdown(value) {
-  if (state.mode !== "countdown") {
+  if (state.mode !== "countdown" || state.prestartPhase !== "countdown") {
     return;
   }
 
@@ -352,8 +366,40 @@ function tickCountdown(value) {
   }
 
   state.countdownTimeoutId = window.setTimeout(() => {
-    beginRound();
+    showGreenLight();
   }, SETTINGS.countdownStepMs);
+}
+
+function showGreenLight() {
+  if (state.mode !== "countdown") {
+    return;
+  }
+
+  state.prestartPhase = "green";
+  state.feedbackText = "Grün! Gleich startet die Aufgabe.";
+  state.feedbackTone = "success";
+  playGoTone();
+  renderGameSurface();
+  centerGameSurface();
+
+  state.countdownTimeoutId = window.setTimeout(() => {
+    showQuestionPreview();
+  }, SETTINGS.greenLightMs);
+}
+
+function showQuestionPreview() {
+  if (state.mode !== "countdown") {
+    return;
+  }
+
+  state.prestartPhase = "preview";
+  state.feedbackText = "Erste Aufgabe im Blick – die Zeit startet sofort.";
+  state.feedbackTone = "";
+  renderGameSurface();
+
+  state.countdownTimeoutId = window.setTimeout(() => {
+    beginRound();
+  }, SETTINGS.questionPreviewMs);
 }
 
 function beginRound() {
@@ -367,20 +413,12 @@ function beginRound() {
 
   state.mode = "playing";
   state.startedAt = now;
-  state.goFlashUntil = now + SETTINGS.goFlashMs;
   state.feedbackText = "Los! Hol dir direkt die ersten richtigen Antworten.";
   state.feedbackTone = "success";
 
-  playGoTone();
   startTimer();
   render();
   centerGameSurface();
-
-  state.goFlashTimerId = window.setTimeout(() => {
-    if (state.mode === "playing") {
-      renderGameSurface();
-    }
-  }, SETTINGS.goFlashMs);
 }
 
 function startTimer() {
@@ -396,7 +434,7 @@ function startTimer() {
       return;
     }
 
-    renderStats();
+    renderGameSurface();
   }, 100);
 }
 
@@ -413,14 +451,9 @@ function clearCountdown() {
     state.countdownTimeoutId = null;
   }
 
-  if (state.goFlashTimerId) {
-    window.clearTimeout(state.goFlashTimerId);
-    state.goFlashTimerId = null;
-  }
-
   stopActiveTones();
+  state.prestartPhase = "countdown";
   state.countdownValue = SETTINGS.countdownSeconds;
-  state.goFlashUntil = 0;
 }
 
 function submitAnswer() {
@@ -561,8 +594,6 @@ function resetScores() {
 
 function render() {
   renderControls();
-  renderStats();
-  renderMotivation();
   renderGameSurface();
   renderResultSummary();
   renderRankings();
@@ -570,6 +601,7 @@ function render() {
 
 function renderControls() {
   elements.playerNameInput.readOnly = state.mode === "playing" || state.mode === "countdown";
+  elements.toggleChartButton.disabled = state.mode === "playing" || state.mode === "countdown";
 
   if (state.mode === "playing" || state.mode === "countdown") {
     elements.startButton.textContent = "Neu starten";
@@ -580,111 +612,80 @@ function renderControls() {
   }
 }
 
-function renderMotivation() {
-  const { kicker, text } = getMotivationCopy();
-  const progress = getRoundProgressPercent();
-  const displayStreak = state.mode === "finished" && state.lastResult
-    ? state.lastResult.bestStreak
-    : state.correctStreak;
-
-  elements.progressFill.style.width = `${progress.toFixed(1)}%`;
-  elements.motivationKicker.textContent = kicker;
-  elements.motivationText.textContent = text;
-
-  let streakLabel = "Serie 0";
-
-  if (state.mode === "countdown") {
-    streakLabel = "Auf die Plätze";
-  } else if (state.mode === "playing") {
-    streakLabel = displayStreak > 1 ? `Serie ${displayStreak}` : "Runde läuft";
-  } else if (state.mode === "finished" && state.lastResult) {
-    streakLabel = displayStreak > 1
-      ? `Beste Serie ${displayStreak}`
-      : "Runde geschafft";
-  }
-
-  elements.streakPill.textContent = streakLabel;
-  elements.streakPill.className = `streak-pill${displayStreak >= 3 ? " is-hot" : ""}`;
-}
-
-function renderStats() {
-  const playerName = getSelectedPlayerName();
-  const overallBest = getOverallBest(state.scores);
-  const personalBest = getPersonalBest(playerName, state.scores);
-  const answeredCount = state.mode === "finished" && state.lastResult
-    ? SETTINGS.totalQuestions - state.lastResult.unanswered
-    : state.mode === "playing"
-      ? state.questionIndex + 1
-      : 0;
-  const remaining = state.mode === "playing"
-    ? getRemainingSeconds()
-    : state.mode === "finished" && state.lastResult
-      ? Math.max(0, SETTINGS.maxTimeSeconds - state.lastResult.rawTime)
-      : SETTINGS.maxTimeSeconds;
-
-  elements.playerStat.textContent = playerName;
-  elements.progressStat.textContent = `${Math.min(answeredCount, SETTINGS.totalQuestions)} / ${SETTINGS.totalQuestions}`;
-  elements.timeStat.textContent = formatSeconds(remaining, 1);
-  elements.errorsStat.textContent = String(state.errors);
-  elements.overallBestStat.textContent = overallBest === null ? "–" : formatSeconds(overallBest);
-  elements.personalBestStat.textContent = personalBest === null ? "–" : formatSeconds(personalBest);
-}
-
 function renderGameSurface() {
   const question = state.questions[state.questionIndex];
   const hasAnswer = Boolean(state.answerBuffer);
-  const showGoFlash = renderCountdownPanel();
+  const showCountdownPanel = renderCountdownPanel();
 
   elements.feedbackText.textContent = state.feedbackText;
   elements.feedbackText.className = `feedback${state.feedbackTone ? ` ${state.feedbackTone}` : ""}`;
 
-  elements.answerBoard.hidden = state.mode === "countdown";
+  elements.answerBoard.hidden = state.mode === "countdown" && state.prestartPhase !== "preview";
 
   if (state.mode === "countdown") {
+    if (state.prestartPhase === "green") {
+      elements.modePill.textContent = "Grün";
+      elements.questionLabel.textContent = "Ampel ist grün";
+      elements.questionText.textContent = "LOS!";
+      elements.answerBoard.textContent = "–";
+      elements.answerBoard.classList.add("placeholder");
+      elements.hintText.textContent = "Die grüne Ampel bleibt kurz sichtbar, dann kommt die erste Aufgabe.";
+      return;
+    }
+
+    if (state.prestartPhase === "preview" && question) {
+      elements.modePill.textContent = "Achtung";
+      elements.questionLabel.textContent = "Erste Aufgabe · noch ohne Zeitdruck";
+      elements.questionText.textContent = `${question.a} × ${question.b}`;
+      elements.answerBoard.textContent = "–";
+      elements.answerBoard.classList.add("placeholder");
+      elements.hintText.textContent = "Noch eine halbe Sekunde merken, dann startet die Zeit.";
+      return;
+    }
+
     elements.modePill.textContent = "Startet gleich";
-    elements.questionLabel.textContent = "Die erste Aufgabe erscheint erst bei Grün.";
-    elements.questionText.textContent = `${state.playerName}, gleich geht dein Mathe-Run los.`;
+    elements.questionLabel.textContent = "Rennstart · 3 Ampelphasen · dann Grün";
+    elements.questionText.textContent = `${state.playerName}, gleich geht es los.`;
     elements.answerBoard.textContent = "–";
     elements.answerBoard.classList.add("placeholder");
-    elements.hintText.textContent = "Kurz warten: Aufgabe und Zeit starten erst nach dem 3-2-1-Countdown.";
+    elements.hintText.textContent = "Kurz warten: Erst kommt Grün, dann kurz die erste Aufgabe, dann startet die Zeit.";
     return;
   }
 
   if (state.mode === "playing" && question) {
-    elements.modePill.textContent = showGoFlash ? "Los!" : "Läuft";
-    elements.questionLabel.textContent = `Aufgabe ${state.questionIndex + 1} von ${SETTINGS.totalQuestions}`;
+    elements.modePill.textContent = "Läuft";
+    elements.questionLabel.textContent = `Aufgabe ${state.questionIndex + 1} von ${SETTINGS.totalQuestions} · noch ${formatSeconds(getRemainingSeconds(), 1)} · ${state.errors} Fehler`;
     elements.questionText.textContent = `${question.a} × ${question.b}`;
     elements.answerBoard.textContent = hasAnswer ? state.answerBuffer : "–";
     elements.answerBoard.classList.toggle("placeholder", !hasAnswer);
-    elements.hintText.textContent = showGoFlash
-      ? "Los! Antwort direkt tippen – Backspace korrigiert, Enter bestätigt."
+    elements.hintText.textContent = showCountdownPanel
+      ? "Antwort direkt tippen – Backspace korrigiert, Enter bestätigt."
       : "Antwort direkt tippen – Backspace korrigiert, Enter bestätigt.";
     return;
   }
 
   if (state.mode === "finished" && state.lastResult) {
     elements.modePill.textContent = state.lastResult.reason === "timeout" ? "Zeit um" : "Fertig";
-    elements.questionLabel.textContent = "Enter startet die nächste Runde mit kurzem Countdown";
+    elements.questionLabel.textContent = `${state.lastResult.mistakes} Fehler · ${state.lastResult.unanswered} offen · Enter startet neu`;
     elements.questionText.textContent = `${state.playerName}, stark gespielt!`;
     elements.answerBoard.hidden = false;
     elements.answerBoard.textContent = formatSeconds(state.lastResult.finalTime);
     elements.answerBoard.classList.remove("placeholder");
-    elements.hintText.textContent = "Die nächste Runde startet wieder mit viel Tempo, Lob und klarem Fokus auf Aufgabe und Antwort.";
+    elements.hintText.textContent = "Enter startet die nächste Runde wieder mit kurzem Rennstart.";
     return;
   }
 
   elements.modePill.textContent = "Bereit";
-  elements.questionLabel.textContent = "10 Aufgaben · 90 Sekunden · +5 Sekunden pro Fehler · Start mit Countdown";
-  elements.questionText.textContent = "Bereit für deine nächste Mathe-Mission?";
+  elements.questionLabel.textContent = "10 Aufgaben · 90 Sekunden · +5 Sekunden pro Fehler";
+  elements.questionText.textContent = "Drücke Enter für die nächste Runde.";
   elements.answerBoard.hidden = false;
   elements.answerBoard.textContent = "–";
   elements.answerBoard.classList.add("placeholder");
-  elements.hintText.textContent = "Vor jeder Runde gibt es eine kurze Ampel mit 3-2-1-Countdown. Danach heißt es: tippen, freuen, schneller werden.";
+  elements.hintText.textContent = "Vor jeder Runde gibt es einen kurzen Rennstart mit Ampel und Startsignal.";
 }
 
 function renderCountdownPanel() {
-  const showGoFlash = state.mode === "playing" && performance.now() < state.goFlashUntil;
-  const shouldShow = state.mode === "countdown" || showGoFlash;
+  const shouldShow = state.mode === "countdown" && state.prestartPhase !== "preview";
 
   elements.countdownPanel.hidden = !shouldShow;
 
@@ -694,18 +695,18 @@ function renderCountdownPanel() {
     return false;
   }
 
-  const phase = state.mode === "countdown"
-    ? getCountdownPhase(state.countdownValue)
-    : "green";
-  const label = state.mode === "countdown"
-    ? String(state.countdownValue)
-    : "LOS!";
+  const phase = state.prestartPhase === "green"
+    ? "green"
+    : getCountdownPhase(state.countdownValue);
+  const label = state.prestartPhase === "green"
+    ? "LOS!"
+    : String(state.countdownValue);
 
   elements.countdownPanel.dataset.phase = phase;
   elements.trafficLight.dataset.phase = phase;
   elements.countdownValue.textContent = label;
 
-  return showGoFlash;
+  return shouldShow;
 }
 
 function getCountdownPhase(value) {
@@ -743,95 +744,6 @@ function getRetryFeedback() {
 function getRevealFeedback(product) {
   return pickFromList(COPY.reveal, state.errors + state.questionIndex)
     .replace("%product%", String(product));
-}
-
-function getMotivationCopy() {
-  if (state.mode === "countdown") {
-    return {
-      kicker: "Auf die Plätze",
-      text: "Bei Grün geht's los – hol dir 10 starke Antworten.",
-    };
-  }
-
-  if (state.mode === "playing") {
-    if (state.correctStreak >= 5) {
-      return {
-        kicker: `Mega-Serie ${state.correctStreak}`,
-        text: "Du bist gerade blitzschnell unterwegs.",
-      };
-    }
-
-    if (state.correctStreak >= 3) {
-      return {
-        kicker: `Flow-Moment ${state.correctStreak}`,
-        text: "Richtig stark – bleib genau so dran.",
-      };
-    }
-
-    if (state.questionIndex >= SETTINGS.totalQuestions - 2) {
-      return {
-        kicker: "Fast im Ziel",
-        text: "Nur noch wenige Aufgaben bis zur Ziellinie.",
-      };
-    }
-
-    if (state.questionIndex === 0) {
-      return {
-        kicker: "Erste Mission",
-        text: "Ruhig starten und dann Tempo aufnehmen.",
-      };
-    }
-
-    return {
-      kicker: `${state.questionIndex} von ${SETTINGS.totalQuestions} geschafft`,
-      text: "Eine Aufgabe nach der anderen – du schaffst das.",
-    };
-  }
-
-  if (state.mode === "finished" && state.lastResult) {
-    if (state.lastResult.isNewOverallBest) {
-      return {
-        kicker: "Raketen-Rekord",
-        text: "Neue absolute Bestzeit. Das war überragend.",
-      };
-    }
-
-    if (state.lastResult.isNewPersonalBest) {
-      return {
-        kicker: "Persönlicher Rekord",
-        text: "Yes! Du wirst sichtbar schneller.",
-      };
-    }
-
-    if (state.lastResult.reason === "timeout") {
-      return {
-        kicker: "Dranbleiben zählt",
-        text: "Jede Runde trainiert dein Tempo – gleich nochmal?",
-      };
-    }
-
-    return {
-      kicker: "Stark gemacht",
-      text: "Jede Runde macht dich sicherer und schneller.",
-    };
-  }
-
-  return {
-    kicker: "Mathe-Mission",
-    text: "Kurze Runde, viel Lob und mit jeder Aufgabe mehr Tempo.",
-  };
-}
-
-function getRoundProgressPercent() {
-  if (state.mode === "finished") {
-    return 100;
-  }
-
-  if (state.mode !== "playing") {
-    return 0;
-  }
-
-  return (state.questionIndex / SETTINGS.totalQuestions) * 100;
 }
 
 function getRewardBadge() {
@@ -922,7 +834,10 @@ function renderRewardBadge() {
 function renderRankings() {
   renderTopList();
   renderPersonalList();
-  renderChartPanel();
+
+  if (state.chartModalOpen) {
+    renderChartModal();
+  }
 }
 
 function renderTopList() {
@@ -986,21 +901,12 @@ function renderPersonalList() {
     .join("");
 }
 
-function renderChartPanel() {
+function renderChartModal() {
   const topEntries = getTopEntries();
   const currentPlayer = getSelectedPlayerName();
 
-  elements.topList.hidden = state.chartOpen;
-  elements.toggleChartButton.textContent = state.chartOpen ? "Liste anzeigen" : "Diagramm anzeigen";
-  elements.toggleChartButton.setAttribute("aria-expanded", String(state.chartOpen));
-  elements.chartPanel.hidden = !state.chartOpen;
-
-  if (!state.chartOpen) {
-    return;
-  }
-
   if (!topEntries.length) {
-    elements.chartPanel.innerHTML = `<div class="placeholder-card">Noch keine Zeiten für ein Diagramm gespeichert.</div>`;
+    elements.chartModalContent.innerHTML = `<div class="placeholder-card">Noch keine Zeiten für ein Diagramm gespeichert.</div>`;
     return;
   }
 
@@ -1008,9 +914,9 @@ function renderChartPanel() {
   const fastest = Math.min(...times);
   const slowest = Math.max(...times);
 
-  elements.chartPanel.innerHTML = `
+  elements.chartModalContent.innerHTML = `
     <p class="chart-copy">
-      Die Bestenliste als Balkendiagramm. Längere Balken bedeuten schnellere Runden.
+      Die schnellsten Zeiten als Balkendiagramm. Längere Balken bedeuten schnellere Runden.
     </p>
     <div class="chart-legend">
       <span class="legend-chip player">dein Name</span>
@@ -1041,6 +947,30 @@ function renderChartPanel() {
       }).join("")}
     </div>
   `;
+}
+
+function openChartModal() {
+  state.chartModalOpen = true;
+  elements.chartModal.hidden = false;
+  elements.toggleChartButton.setAttribute("aria-expanded", "true");
+  document.body.classList.add("modal-open");
+  renderChartModal();
+  elements.closeChartButton.focus();
+}
+
+function closeChartModal({ restoreFocus = true } = {}) {
+  if (!state.chartModalOpen && elements.chartModal.hidden) {
+    return;
+  }
+
+  state.chartModalOpen = false;
+  elements.chartModal.hidden = true;
+  elements.toggleChartButton.setAttribute("aria-expanded", "false");
+  document.body.classList.remove("modal-open");
+
+  if (restoreFocus) {
+    elements.toggleChartButton.focus();
+  }
 }
 
 function getTopEntries(limit = SETTINGS.chartEntries) {
@@ -1277,16 +1207,19 @@ function playCountdownTone(step) {
 
   const presetByStep = {
     3: [
-      { frequency: 392, slideTo: 370, type: "square", duration: 0.12, volume: 0.05 },
-      { frequency: 132, slideTo: 104, type: "sawtooth", duration: 0.14, volume: 0.018, delay: 0.01 },
+      { frequency: 659.25, slideTo: 622.25, type: "square", duration: 0.08, volume: 0.06 },
+      { frequency: 1318.5, slideTo: 1244.51, type: "square", duration: 0.07, volume: 0.024, delay: 0.004 },
+      { frequency: 164.81, slideTo: 146.83, type: "triangle", duration: 0.12, volume: 0.014, delay: 0.006 },
     ],
     2: [
-      { frequency: 392, slideTo: 370, type: "square", duration: 0.12, volume: 0.055 },
-      { frequency: 146.83, slideTo: 110, type: "sawtooth", duration: 0.14, volume: 0.02, delay: 0.01 },
+      { frequency: 659.25, slideTo: 622.25, type: "square", duration: 0.08, volume: 0.068 },
+      { frequency: 1318.5, slideTo: 1244.51, type: "square", duration: 0.07, volume: 0.026, delay: 0.004 },
+      { frequency: 174.61, slideTo: 155.56, type: "triangle", duration: 0.12, volume: 0.016, delay: 0.006 },
     ],
     1: [
-      { frequency: 493.88, slideTo: 523.25, type: "square", duration: 0.16, volume: 0.07 },
-      { frequency: 164.81, slideTo: 123.47, type: "sawtooth", duration: 0.18, volume: 0.022, delay: 0.012 },
+      { frequency: 783.99, slideTo: 880, type: "square", duration: 0.1, volume: 0.082 },
+      { frequency: 1567.98, slideTo: 1760, type: "square", duration: 0.09, volume: 0.03, delay: 0.004 },
+      { frequency: 196, slideTo: 174.61, type: "triangle", duration: 0.14, volume: 0.018, delay: 0.008 },
     ],
   };
 
@@ -1303,10 +1236,12 @@ function playGoTone() {
   }
 
   const tones = [
-    { frequency: 523.25, slideTo: 659.25, type: "triangle", duration: 0.12, volume: 0.075 },
-    { frequency: 659.25, slideTo: 783.99, type: "triangle", duration: 0.12, volume: 0.085, delay: 0.07 },
-    { frequency: 783.99, slideTo: 1046.5, type: "triangle", duration: 0.18, volume: 0.095, delay: 0.14 },
-    { frequency: 196, slideTo: 98, type: "sawtooth", duration: 0.24, volume: 0.024, delay: 0.01 },
+    { frequency: 783.99, slideTo: 880, type: "square", duration: 0.09, volume: 0.075 },
+    { frequency: 987.77, slideTo: 1046.5, type: "square", duration: 0.09, volume: 0.078, delay: 0.05 },
+    { frequency: 1174.66, slideTo: 1318.51, type: "square", duration: 0.12, volume: 0.082, delay: 0.1 },
+    { frequency: 1567.98, slideTo: 1760, type: "square", duration: 0.16, volume: 0.05, delay: 0.14 },
+    { frequency: 392, slideTo: 261.63, type: "triangle", duration: 0.22, volume: 0.03, delay: 0.02 },
+    { frequency: 130.81, slideTo: 98, type: "sawtooth", duration: 0.24, volume: 0.016, delay: 0.01 },
   ];
 
   for (const tone of tones) {
