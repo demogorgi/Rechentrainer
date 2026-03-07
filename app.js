@@ -111,6 +111,7 @@ const elements = {
   motivationText: document.getElementById("motivationText"),
   modePill: document.getElementById("modePill"),
   streakPill: document.getElementById("streakPill"),
+  gameSurface: document.getElementById("gameSurface"),
   questionLabel: document.getElementById("questionLabel"),
   questionText: document.getElementById("questionText"),
   countdownPanel: document.getElementById("countdownPanel"),
@@ -131,7 +132,6 @@ const elements = {
   chartPanel: document.getElementById("chartPanel"),
   personalList: document.getElementById("personalList"),
   personalSectionLabel: document.getElementById("personalSectionLabel"),
-  historyList: document.getElementById("historyList"),
 };
 
 init();
@@ -307,6 +307,7 @@ function startGame() {
   state.goFlashUntil = 0;
 
   elements.playerNameInput.blur();
+  centerGameSurface();
   primeAudioContext();
   render();
   startCountdown();
@@ -370,8 +371,10 @@ function beginRound() {
   state.feedbackText = "Los! Hol dir direkt die ersten richtigen Antworten.";
   state.feedbackTone = "success";
 
+  playGoTone();
   startTimer();
   render();
+  centerGameSurface();
 
   state.goFlashTimerId = window.setTimeout(() => {
     if (state.mode === "playing") {
@@ -919,7 +922,6 @@ function renderRewardBadge() {
 function renderRankings() {
   renderTopList();
   renderPersonalList();
-  renderHistory();
   renderChartPanel();
 }
 
@@ -984,59 +986,12 @@ function renderPersonalList() {
     .join("");
 }
 
-function renderHistory() {
-  const currentPlayer = getSelectedPlayerName();
-  const recentEntries = [...state.scores]
-    .map((entry, index) => ({ entry, index }))
-    .sort((left, right) => {
-      const rightTime = parseStoredDate(right.entry.datum)?.getTime() ?? right.index;
-      const leftTime = parseStoredDate(left.entry.datum)?.getTime() ?? left.index;
-      return rightTime - leftTime;
-    })
-    .slice(0, 10)
-    .map((item) => item.entry);
-
-  if (!recentEntries.length) {
-    elements.historyList.innerHTML = `<div class="placeholder-card">Noch keine Runden im Verlauf.</div>`;
-    return;
-  }
-
-  const times = recentEntries.map((entry) => entry.zeit);
-  const fastest = Math.min(...times);
-  const slowest = Math.max(...times);
-
-  elements.historyList.innerHTML = recentEntries
-    .map((entry) => {
-      const width = fastest === slowest
-        ? 100
-        : 30 + ((slowest - entry.zeit) / (slowest - fastest)) * 70;
-
-      return `
-        <article class="history-item${getEntryHighlightClasses(entry, currentPlayer)}">
-          <div class="history-head">
-            <div>
-              <div class="history-name-line">
-                <div class="history-name">${escapeHtml(entry.name)}</div>
-                ${renderEntryFlags(entry, currentPlayer)}
-              </div>
-              <div class="history-meta">${escapeHtml(formatDisplayDate(entry.datum))}</div>
-            </div>
-            <div class="history-time">${formatSeconds(entry.zeit)}</div>
-          </div>
-          <div class="history-track">
-            <div class="history-fill" style="width: ${width.toFixed(1)}%"></div>
-          </div>
-        </article>
-      `;
-    })
-    .join("");
-}
-
 function renderChartPanel() {
   const topEntries = getTopEntries();
   const currentPlayer = getSelectedPlayerName();
 
-  elements.toggleChartButton.textContent = state.chartOpen ? "Diagramm ausblenden" : "Diagramm anzeigen";
+  elements.topList.hidden = state.chartOpen;
+  elements.toggleChartButton.textContent = state.chartOpen ? "Liste anzeigen" : "Diagramm anzeigen";
   elements.toggleChartButton.setAttribute("aria-expanded", String(state.chartOpen));
   elements.chartPanel.hidden = !state.chartOpen;
 
@@ -1055,7 +1010,7 @@ function renderChartPanel() {
 
   elements.chartPanel.innerHTML = `
     <p class="chart-copy">
-      Balkendiagramm der aktuell schnellsten ${topEntries.length} Zeiten. Längere Balken bedeuten schnellere Runden.
+      Die Bestenliste als Balkendiagramm. Längere Balken bedeuten schnellere Runden.
     </p>
     <div class="chart-legend">
       <span class="legend-chip player">dein Name</span>
@@ -1314,10 +1269,56 @@ function getAudioContext() {
 }
 
 function playCountdownTone(step) {
-  const audioContext = getAudioContext();
+  const audioContext = getPreparedAudioContext();
 
   if (!audioContext) {
     return;
+  }
+
+  const presetByStep = {
+    3: [
+      { frequency: 392, slideTo: 370, type: "square", duration: 0.12, volume: 0.05 },
+      { frequency: 132, slideTo: 104, type: "sawtooth", duration: 0.14, volume: 0.018, delay: 0.01 },
+    ],
+    2: [
+      { frequency: 392, slideTo: 370, type: "square", duration: 0.12, volume: 0.055 },
+      { frequency: 146.83, slideTo: 110, type: "sawtooth", duration: 0.14, volume: 0.02, delay: 0.01 },
+    ],
+    1: [
+      { frequency: 493.88, slideTo: 523.25, type: "square", duration: 0.16, volume: 0.07 },
+      { frequency: 164.81, slideTo: 123.47, type: "sawtooth", duration: 0.18, volume: 0.022, delay: 0.012 },
+    ],
+  };
+
+  for (const tone of presetByStep[step] || []) {
+    playSynthTone(audioContext, tone);
+  }
+}
+
+function playGoTone() {
+  const audioContext = getPreparedAudioContext();
+
+  if (!audioContext) {
+    return;
+  }
+
+  const tones = [
+    { frequency: 523.25, slideTo: 659.25, type: "triangle", duration: 0.12, volume: 0.075 },
+    { frequency: 659.25, slideTo: 783.99, type: "triangle", duration: 0.12, volume: 0.085, delay: 0.07 },
+    { frequency: 783.99, slideTo: 1046.5, type: "triangle", duration: 0.18, volume: 0.095, delay: 0.14 },
+    { frequency: 196, slideTo: 98, type: "sawtooth", duration: 0.24, volume: 0.024, delay: 0.01 },
+  ];
+
+  for (const tone of tones) {
+    playSynthTone(audioContext, tone);
+  }
+}
+
+function getPreparedAudioContext() {
+  const audioContext = getAudioContext();
+
+  if (!audioContext) {
+    return null;
   }
 
   if (audioContext.state === "suspended") {
@@ -1326,24 +1327,35 @@ function playCountdownTone(step) {
     });
   }
 
+  return audioContext;
+}
+
+function playSynthTone(
+  audioContext,
+  {
+    frequency,
+    slideTo = frequency,
+    type = "sine",
+    duration = 0.16,
+    volume = 0.08,
+    delay = 0,
+  }
+) {
   const tone = {
     oscillator: audioContext.createOscillator(),
     gainNode: audioContext.createGain(),
   };
-  const frequencyByStep = {
-    3: 523.25,
-    2: 659.25,
-    1: 783.99,
-  };
   const now = audioContext.currentTime;
-  const duration = step === 1 ? 0.26 : 0.2;
+  const startAt = now + delay;
+  const stopAt = startAt + duration;
 
-  tone.oscillator.type = step === 1 ? "triangle" : "sine";
-  tone.oscillator.frequency.setValueAtTime(frequencyByStep[step] || 523.25, now);
+  tone.oscillator.type = type;
+  tone.oscillator.frequency.setValueAtTime(Math.max(1, frequency), startAt);
+  tone.oscillator.frequency.exponentialRampToValueAtTime(Math.max(1, slideTo), stopAt);
 
-  tone.gainNode.gain.setValueAtTime(0.0001, now);
-  tone.gainNode.gain.exponentialRampToValueAtTime(step === 1 ? 0.12 : 0.09, now + 0.02);
-  tone.gainNode.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+  tone.gainNode.gain.setValueAtTime(0.0001, startAt);
+  tone.gainNode.gain.exponentialRampToValueAtTime(volume, startAt + Math.min(0.018, duration / 3));
+  tone.gainNode.gain.exponentialRampToValueAtTime(0.0001, stopAt);
 
   tone.oscillator.connect(tone.gainNode);
   tone.gainNode.connect(audioContext.destination);
@@ -1361,8 +1373,8 @@ function playCountdownTone(step) {
     }
   };
 
-  tone.oscillator.start(now);
-  tone.oscillator.stop(now + duration + 0.02);
+  tone.oscillator.start(startAt);
+  tone.oscillator.stop(stopAt + 0.02);
 }
 
 function stopActiveTones() {
@@ -1382,6 +1394,22 @@ function stopActiveTones() {
   }
 
   state.activeTones = [];
+}
+
+function centerGameSurface() {
+  if (!elements.gameSurface) {
+    return;
+  }
+
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  window.requestAnimationFrame(() => {
+    elements.gameSurface.scrollIntoView({
+      behavior: reduceMotion ? "auto" : "smooth",
+      block: "center",
+      inline: "nearest",
+    });
+  });
 }
 
 function clearFeedback() {

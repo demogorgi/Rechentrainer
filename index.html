@@ -100,7 +100,7 @@
           </div>
         </section>
 
-        <div class="game-surface">
+        <div class="game-surface" id="gameSurface">
           <div class="surface-topline">
             <span class="mode-pill" id="modePill">Bereit</span>
             <span class="streak-pill" id="streakPill">Serie 0</span>
@@ -160,8 +160,8 @@
         <section class="stack-section" id="bestenliste">
           <div class="section-header">
             <div class="section-heading">
-              <h2>Top 10</h2>
-              <span>alle gespeicherten Zeiten</span>
+              <h2>Bestenliste</h2>
+              <span>die schnellsten Zeiten insgesamt</span>
             </div>
             <button id="toggleChartButton" class="secondary section-action" type="button" aria-expanded="false" aria-controls="chartPanel">
               Diagramm anzeigen
@@ -173,18 +173,10 @@
 
         <section class="stack-section">
           <div class="section-header">
-            <h2>Persönlich</h2>
+            <h2>Persönliche Bestzeiten</h2>
             <span id="personalSectionLabel">für Gast</span>
           </div>
           <ol class="ranking-list" id="personalList"></ol>
-        </section>
-
-        <section class="stack-section" id="verlauf">
-          <div class="section-header">
-            <h2>Verlauf</h2>
-            <span>letzte Runden</span>
-          </div>
-          <div class="history-list" id="historyList"></div>
         </section>
       </aside>
     </main>
