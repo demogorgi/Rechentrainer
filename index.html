@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rechentrainer – Kleines Einmaleins</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <noscript>
+    <div class="noscript-banner">Für den Rechentrainer muss JavaScript aktiviert sein.</div>
+  </noscript>
+
+  <div class="app-shell">
+    <section class="panel intro-panel">
+      <div class="intro-copy">
+        <p class="eyebrow">GitHub Pages · statisch · ohne Backend</p>
+        <h1>Kleines Einmaleins</h1>
+        <p class="lead">
+          Antworten laufen direkt über die Tastatur oder das Ziffernfeld.
+          Während der Runde gibt es bewusst kein Eingabefeld für die Lösung.
+        </p>
+      </div>
+
+      <div class="intro-actions">
+        <label class="field" for="playerNameInput">
+          <span>Spielername</span>
+          <input
+            id="playerNameInput"
+            type="text"
+            maxlength="18"
+            autocomplete="nickname"
+            spellcheck="false"
+            placeholder="Gast"
+          >
+        </label>
+
+        <div class="button-row">
+          <button id="startButton" class="primary" type="button">Runde starten</button>
+          <button id="resetScoresButton" class="secondary" type="button">Zeiten zurücksetzen</button>
+        </div>
+
+        <p class="controls-copy">
+          Während der Runde: <strong>Ziffern tippen</strong> · <strong>Enter</strong> prüft · <strong>Backspace</strong> löscht · <strong>Esc</strong> leert alles.
+        </p>
+      </div>
+    </section>
+
+    <main class="layout">
+      <section class="panel game-panel" aria-labelledby="spielbereich-title">
+        <div class="sr-only" id="spielbereich-title">Spielbereich</div>
+
+        <div class="stats-grid">
+          <article class="stat-card">
+            <span class="stat-label">Spieler</span>
+            <strong class="stat-value" id="playerStat">Gast</strong>
+          </article>
+
+          <article class="stat-card">
+            <span class="stat-label">Aufgabe</span>
+            <strong class="stat-value" id="progressStat">0 / 10</strong>
+          </article>
+
+          <article class="stat-card">
+            <span class="stat-label">Zeit übrig</span>
+            <strong class="stat-value" id="timeStat">90,0 s</strong>
+          </article>
+
+          <article class="stat-card">
+            <span class="stat-label">Fehler</span>
+            <strong class="stat-value" id="errorsStat">0</strong>
+          </article>
+
+          <article class="stat-card">
+            <span class="stat-label">Absolute Bestzeit</span>
+            <strong class="stat-value" id="overallBestStat">–</strong>
+          </article>
+
+          <article class="stat-card">
+            <span class="stat-label">Deine Bestzeit</span>
+            <strong class="stat-value" id="personalBestStat">–</strong>
+          </article>
+        </div>
+
+        <div class="game-surface">
+          <span class="mode-pill" id="modePill">Bereit</span>
+          <p class="question-label" id="questionLabel">10 Aufgaben · 90 Sekunden · +5 Sekunden pro Fehler</p>
+          <h2 class="question-text" id="questionText">Drücke Enter für die nächste Runde.</h2>
+
+          <div class="answer-board placeholder" id="answerBoard" aria-live="polite">–</div>
+
+          <p class="hint" id="hintText">Der Cursor muss nicht in einem Feld stehen. Während der Runde werden Tasten überall auf der Seite erkannt.</p>
+          <p class="feedback" id="feedbackText" role="status" aria-live="polite"></p>
+
+          <div class="keypad" id="keypad" aria-label="Ziffernfeld für Touch-Eingabe">
+            <button type="button" class="keypad-key" data-key="7">7</button>
+            <button type="button" class="keypad-key" data-key="8">8</button>
+            <button type="button" class="keypad-key" data-key="9">9</button>
+            <button type="button" class="keypad-key" data-key="4">4</button>
+            <button type="button" class="keypad-key" data-key="5">5</button>
+            <button type="button" class="keypad-key" data-key="6">6</button>
+            <button type="button" class="keypad-key" data-key="1">1</button>
+            <button type="button" class="keypad-key" data-key="2">2</button>
+            <button type="button" class="keypad-key" data-key="3">3</button>
+            <button type="button" class="keypad-key utility" data-key="clear">C</button>
+            <button type="button" class="keypad-key" data-key="0">0</button>
+            <button type="button" class="keypad-key confirm" data-key="enter">OK</button>
+          </div>
+        </div>
+
+        <section class="result-summary" id="resultSummary" hidden>
+          <div class="result-header">
+            <h3>Letzte Runde</h3>
+            <p id="resultMessage"></p>
+          </div>
+
+          <div class="result-grid">
+            <article class="result-card">
+              <span class="result-label">Rohzeit</span>
+              <strong class="result-value" id="rawTimeResult">–</strong>
+            </article>
+
+            <article class="result-card">
+              <span class="result-label">Fehler</span>
+              <strong class="result-value" id="mistakesResult">–</strong>
+            </article>
+
+            <article class="result-card">
+              <span class="result-label">Unbeantwortet</span>
+              <strong class="result-value" id="unansweredResult">–</strong>
+            </article>
+
+            <article class="result-card accent">
+              <span class="result-label">Gesamtzeit inkl. Strafen</span>
+              <strong class="result-value" id="totalTimeResult">–</strong>
+            </article>
+          </div>
+        </section>
+      </section>
+
+      <aside class="panel sidebar">
+        <section class="stack-section" id="bestenliste">
+          <div class="section-header">
+            <h2>Top 10</h2>
+            <span>alle gespeicherten Zeiten</span>
+          </div>
+          <ol class="ranking-list" id="topList"></ol>
+        </section>
+
+        <section class="stack-section">
+          <div class="section-header">
+            <h2>Persönlich</h2>
+            <span id="personalSectionLabel">für Gast</span>
+          </div>
+          <ol class="ranking-list" id="personalList"></ol>
+        </section>
+
+        <section class="stack-section" id="verlauf">
+          <div class="section-header">
+            <h2>Verlauf</h2>
+            <span>letzte Runden</span>
+          </div>
+          <div class="history-list" id="historyList"></div>
+        </section>
+      </aside>
+    </main>
+
+    <p class="storage-note">
+      Hinweis: Auf GitHub Pages werden neue Ergebnisse im Browser dieses Geräts gespeichert.
+      Die vorhandenen Zeiten aus dem Projekt sind als Startbestand eingebaut.
+    </p>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>
