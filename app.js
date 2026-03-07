@@ -8,6 +8,7 @@ const SETTINGS = Object.freeze({
   maxFactor: 9,
   countdownSeconds: 3,
   countdownStepMs: 800,
+  yellowCountdownMs: 400,
   greenLightMs: 500,
   questionPreviewMs: 500,
   chartEntries: 10,
@@ -16,6 +17,10 @@ const SETTINGS = Object.freeze({
 const STORAGE_KEYS = Object.freeze({
   scores: "rechentrainer-kleines-einmaleins-scores-v1",
   playerName: "rechentrainer-kleines-einmaleins-player-v1",
+});
+
+const AUDIO_FILES = Object.freeze({
+  readySetGo: "./isabellovesfoxes-ready-set-go-sound-268353.mp3",
 });
 
 const SEEDED_SCORES = Object.freeze([
@@ -91,7 +96,7 @@ const state = {
   feedbackText: "",
   feedbackTone: "",
   lastResult: null,
-  chartModalOpen: false,
+  startSequenceAudio: null,
   audioContext: null,
   activeTones: [],
 };
@@ -117,11 +122,7 @@ const elements = {
   mistakesResult: document.getElementById("mistakesResult"),
   unansweredResult: document.getElementById("unansweredResult"),
   totalTimeResult: document.getElementById("totalTimeResult"),
-  topList: document.getElementById("topList"),
-  toggleChartButton: document.getElementById("toggleChartButton"),
-  chartModal: document.getElementById("chartModal"),
-  chartModalContent: document.getElementById("chartModalContent"),
-  closeChartButton: document.getElementById("closeChartButton"),
+  chartPanel: document.getElementById("chartPanel"),
   personalList: document.getElementById("personalList"),
   personalSectionLabel: document.getElementById("personalSectionLabel"),
 };
@@ -131,6 +132,7 @@ init();
 function init() {
   state.scores = loadScores();
   state.playerName = loadPlayerName();
+  state.startSequenceAudio = createStartSequenceAudio();
   elements.playerNameInput.value = state.playerName === "Gast" ? "" : state.playerName;
 
   bindEvents();
@@ -169,35 +171,10 @@ function bindEvents() {
     elements.resetScoresButton.blur();
     resetScores();
   });
-
-  elements.toggleChartButton.addEventListener("click", () => {
-    elements.toggleChartButton.blur();
-    openChartModal();
-  });
-
-  elements.closeChartButton.addEventListener("click", () => {
-    closeChartModal();
-  });
-
-  elements.chartModal.addEventListener("click", (event) => {
-    if (event.target === elements.chartModal) {
-      closeChartModal();
-    }
-  });
 }
 
 function handleGlobalKeydown(event) {
   if (event.metaKey || event.ctrlKey || event.altKey) {
-    return;
-  }
-
-  if (state.chartModalOpen) {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      event.stopPropagation();
-      closeChartModal();
-    }
-
     return;
   }
 
@@ -299,7 +276,6 @@ function startGame() {
 
   clearTimer();
   clearCountdown();
-  closeChartModal({ restoreFocus: false });
 
   state.playerName = normalizeName(elements.playerNameInput.value);
   elements.playerNameInput.value = state.playerName === "Gast" ? "" : state.playerName;
@@ -357,17 +333,18 @@ function tickCountdown(value) {
   state.countdownValue = value;
   playCountdownTone(value);
   renderGameSurface();
+  const stepDelay = value === 1 ? SETTINGS.yellowCountdownMs : SETTINGS.countdownStepMs;
 
   if (value > 1) {
     state.countdownTimeoutId = window.setTimeout(() => {
       tickCountdown(value - 1);
-    }, SETTINGS.countdownStepMs);
+    }, stepDelay);
     return;
   }
 
   state.countdownTimeoutId = window.setTimeout(() => {
     showGreenLight();
-  }, SETTINGS.countdownStepMs);
+  }, stepDelay);
 }
 
 function showGreenLight() {
@@ -380,7 +357,6 @@ function showGreenLight() {
   state.feedbackTone = "success";
   playGoTone();
   renderGameSurface();
-  centerGameSurface();
 
   state.countdownTimeoutId = window.setTimeout(() => {
     showQuestionPreview();
@@ -418,7 +394,6 @@ function beginRound() {
 
   startTimer();
   render();
-  centerGameSurface();
 }
 
 function startTimer() {
@@ -451,6 +426,7 @@ function clearCountdown() {
     state.countdownTimeoutId = null;
   }
 
+  stopStartSequenceAudio();
   stopActiveTones();
   state.prestartPhase = "countdown";
   state.countdownValue = SETTINGS.countdownSeconds;
@@ -601,7 +577,6 @@ function render() {
 
 function renderControls() {
   elements.playerNameInput.readOnly = state.mode === "playing" || state.mode === "countdown";
-  elements.toggleChartButton.disabled = state.mode === "playing" || state.mode === "countdown";
 
   if (state.mode === "playing" || state.mode === "countdown") {
     elements.startButton.textContent = "Neu starten";
@@ -625,8 +600,8 @@ function renderGameSurface() {
   if (state.mode === "countdown") {
     if (state.prestartPhase === "green") {
       elements.modePill.textContent = "Grün";
-      elements.questionLabel.textContent = "Ampel ist grün";
-      elements.questionText.textContent = "LOS!";
+      elements.questionLabel.textContent = "Ampelstart";
+      elements.questionText.textContent = "\u00A0";
       elements.answerBoard.textContent = "–";
       elements.answerBoard.classList.add("placeholder");
       elements.hintText.textContent = "Die grüne Ampel bleibt kurz sichtbar, dann kommt die erste Aufgabe.";
@@ -635,7 +610,7 @@ function renderGameSurface() {
 
     if (state.prestartPhase === "preview" && question) {
       elements.modePill.textContent = "Achtung";
-      elements.questionLabel.textContent = "Erste Aufgabe · noch ohne Zeitdruck";
+      elements.questionLabel.textContent = "Erste Aufgabe";
       elements.questionText.textContent = `${question.a} × ${question.b}`;
       elements.answerBoard.textContent = "–";
       elements.answerBoard.classList.add("placeholder");
@@ -644,8 +619,8 @@ function renderGameSurface() {
     }
 
     elements.modePill.textContent = "Startet gleich";
-    elements.questionLabel.textContent = "Rennstart · 3 Ampelphasen · dann Grün";
-    elements.questionText.textContent = `${state.playerName}, gleich geht es los.`;
+    elements.questionLabel.textContent = "Ampelstart";
+    elements.questionText.textContent = "\u00A0";
     elements.answerBoard.textContent = "–";
     elements.answerBoard.classList.add("placeholder");
     elements.hintText.textContent = "Kurz warten: Erst kommt Grün, dann kurz die erste Aufgabe, dann startet die Zeit.";
@@ -685,7 +660,7 @@ function renderGameSurface() {
 }
 
 function renderCountdownPanel() {
-  const shouldShow = state.mode === "countdown" && state.prestartPhase !== "preview";
+  const shouldShow = state.mode === "countdown";
 
   elements.countdownPanel.hidden = !shouldShow;
 
@@ -695,11 +670,11 @@ function renderCountdownPanel() {
     return false;
   }
 
-  const phase = state.prestartPhase === "green"
+  const phase = state.prestartPhase === "green" || state.prestartPhase === "preview"
     ? "green"
     : getCountdownPhase(state.countdownValue);
-  const label = state.prestartPhase === "green"
-    ? "LOS!"
+  const label = state.prestartPhase === "green" || state.prestartPhase === "preview"
+    ? "\u00A0"
     : String(state.countdownValue);
 
   elements.countdownPanel.dataset.phase = phase;
@@ -832,38 +807,49 @@ function renderRewardBadge() {
 }
 
 function renderRankings() {
-  renderTopList();
+  renderBestChart();
   renderPersonalList();
-
-  if (state.chartModalOpen) {
-    renderChartModal();
-  }
 }
 
-function renderTopList() {
+function renderBestChart() {
   const currentPlayer = getSelectedPlayerName();
   const topEntries = getTopEntries();
 
   if (!topEntries.length) {
-    elements.topList.innerHTML = `<li class="placeholder-card">Noch keine Zeiten gespeichert.</li>`;
+    elements.chartPanel.innerHTML = `<div class="placeholder-card">Noch keine Zeiten gespeichert.</div>`;
     return;
   }
 
-  elements.topList.innerHTML = topEntries
-    .map((entry, index) => `
-      <li class="ranking-item${getEntryHighlightClasses(entry, currentPlayer)}">
-        <span class="rank-badge">${index + 1}</span>
-        <div>
-          <div class="entry-line">
-            <span class="entry-name">${escapeHtml(entry.name)}</span>
-            ${renderEntryFlags(entry, currentPlayer)}
+  const slowest = Math.max(...topEntries.map((entry) => entry.zeit));
+
+  elements.chartPanel.innerHTML = `
+    <div class="chart-grid">
+      ${topEntries.map((entry, index) => {
+        const width = slowest <= 0 ? 0 : (entry.zeit / slowest) * 100;
+
+        return `
+          <div class="chart-row${getEntryHighlightClasses(entry, currentPlayer)}">
+            <div class="chart-head">
+              <div class="chart-title-row">
+                <span class="rank-badge">${index + 1}</span>
+                <div class="chart-label">
+                  <div class="entry-line">
+                    <span class="chart-name">${escapeHtml(entry.name)}</span>
+                    ${renderEntryFlags(entry, currentPlayer)}
+                  </div>
+                  <span class="entry-meta">${escapeHtml(formatDisplayDate(entry.datum))}</span>
+                </div>
+              </div>
+              <span class="chart-value">${formatSeconds(entry.zeit)}</span>
+            </div>
+            <div class="chart-bar-track" aria-hidden="true">
+              <div class="chart-bar" style="width: ${width.toFixed(1)}%"></div>
+            </div>
           </div>
-          <span class="entry-meta">${escapeHtml(formatDisplayDate(entry.datum))}</span>
-        </div>
-        <span class="entry-time">${formatSeconds(entry.zeit)}</span>
-      </li>
-    `)
-    .join("");
+        `;
+      }).join("")}
+    </div>
+  `;
 }
 
 function renderPersonalList() {
@@ -899,78 +885,6 @@ function renderPersonalList() {
       </li>
     `)
     .join("");
-}
-
-function renderChartModal() {
-  const topEntries = getTopEntries();
-  const currentPlayer = getSelectedPlayerName();
-
-  if (!topEntries.length) {
-    elements.chartModalContent.innerHTML = `<div class="placeholder-card">Noch keine Zeiten für ein Diagramm gespeichert.</div>`;
-    return;
-  }
-
-  const times = topEntries.map((entry) => entry.zeit);
-  const fastest = Math.min(...times);
-  const slowest = Math.max(...times);
-
-  elements.chartModalContent.innerHTML = `
-    <p class="chart-copy">
-      Die schnellsten Zeiten als Balkendiagramm. Längere Balken bedeuten schnellere Runden.
-    </p>
-    <div class="chart-legend">
-      <span class="legend-chip player">dein Name</span>
-      <span class="legend-chip last">letzte Runde</span>
-    </div>
-    <div class="chart-grid">
-      ${topEntries.map((entry, index) => {
-        const width = fastest === slowest
-          ? 100
-          : 30 + ((slowest - entry.zeit) / (slowest - fastest)) * 70;
-
-        return `
-          <div class="chart-row${getEntryHighlightClasses(entry, currentPlayer)}">
-            <div class="chart-label">
-              <span class="chart-rank">#${index + 1}</span>
-              <div class="entry-line">
-                <span class="chart-name">${escapeHtml(entry.name)}</span>
-                ${renderEntryFlags(entry, currentPlayer)}
-              </div>
-              <span class="entry-meta">${escapeHtml(formatDisplayDate(entry.datum))}</span>
-            </div>
-            <div class="chart-bar-track" aria-hidden="true">
-              <div class="chart-bar" style="width: ${width.toFixed(1)}%"></div>
-            </div>
-            <span class="chart-value">${formatSeconds(entry.zeit)}</span>
-          </div>
-        `;
-      }).join("")}
-    </div>
-  `;
-}
-
-function openChartModal() {
-  state.chartModalOpen = true;
-  elements.chartModal.hidden = false;
-  elements.toggleChartButton.setAttribute("aria-expanded", "true");
-  document.body.classList.add("modal-open");
-  renderChartModal();
-  elements.closeChartButton.focus();
-}
-
-function closeChartModal({ restoreFocus = true } = {}) {
-  if (!state.chartModalOpen && elements.chartModal.hidden) {
-    return;
-  }
-
-  state.chartModalOpen = false;
-  elements.chartModal.hidden = true;
-  elements.toggleChartButton.setAttribute("aria-expanded", "false");
-  document.body.classList.remove("modal-open");
-
-  if (restoreFocus) {
-    elements.toggleChartButton.focus();
-  }
 }
 
 function getTopEntries(limit = SETTINGS.chartEntries) {
@@ -1175,12 +1089,69 @@ function parseStoredDate(storedDate) {
 }
 
 function primeAudioContext() {
+  if (state.startSequenceAudio) {
+    try {
+      state.startSequenceAudio.load();
+    } catch {
+      // Ignorieren – der Browser lädt die Datei sonst bei Bedarf.
+    }
+  }
+
   const audioContext = getAudioContext();
 
   if (audioContext && audioContext.state === "suspended") {
     audioContext.resume().catch(() => {
       // Stille Fallback-Lösung, falls der Browser Audio blockiert.
     });
+  }
+}
+
+function createStartSequenceAudio() {
+  try {
+    const audio = new Audio(AUDIO_FILES.readySetGo);
+
+    audio.preload = "auto";
+    audio.volume = 0.95;
+
+    return audio;
+  } catch {
+    return null;
+  }
+}
+
+function playStartSequenceAudio() {
+  if (!state.startSequenceAudio) {
+    return false;
+  }
+
+  try {
+    state.startSequenceAudio.pause();
+    state.startSequenceAudio.currentTime = 0;
+
+    const playPromise = state.startSequenceAudio.play();
+
+    if (playPromise && typeof playPromise.catch === "function") {
+      playPromise.catch(() => {
+        // Wenn der Browser blockiert, bleibt die visuelle Startsequenz erhalten.
+      });
+    }
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function stopStartSequenceAudio() {
+  if (!state.startSequenceAudio) {
+    return;
+  }
+
+  try {
+    state.startSequenceAudio.pause();
+    state.startSequenceAudio.currentTime = 0;
+  } catch {
+    // Bereits gestoppt.
   }
 }
 
@@ -1199,6 +1170,14 @@ function getAudioContext() {
 }
 
 function playCountdownTone(step) {
+  if (state.startSequenceAudio) {
+    if (step === SETTINGS.countdownSeconds) {
+      playStartSequenceAudio();
+    }
+
+    return;
+  }
+
   const audioContext = getPreparedAudioContext();
 
   if (!audioContext) {
@@ -1229,6 +1208,10 @@ function playCountdownTone(step) {
 }
 
 function playGoTone() {
+  if (state.startSequenceAudio) {
+    return;
+  }
+
   const audioContext = getPreparedAudioContext();
 
   if (!audioContext) {

@@ -52,7 +52,6 @@
         <div class="game-surface" id="gameSurface">
           <span class="mode-pill" id="modePill">Bereit</span>
           <p class="question-label" id="questionLabel">10 Aufgaben · 90 Sekunden · +5 Sekunden pro Fehler</p>
-          <h2 class="question-text" id="questionText">Drücke Enter für die nächste Runde.</h2>
 
           <div class="countdown-panel" id="countdownPanel" hidden aria-live="assertive" aria-atomic="true">
             <div class="traffic-light" id="trafficLight" data-phase="red" aria-hidden="true">
@@ -62,6 +61,8 @@
             </div>
             <div class="countdown-value" id="countdownValue">3</div>
           </div>
+
+          <h2 class="question-text" id="questionText">Drücke Enter für die nächste Runde.</h2>
 
           <div class="answer-board placeholder" id="answerBoard" aria-live="polite">–</div>
 
@@ -109,11 +110,8 @@
               <h2>Bestenliste</h2>
               <span>die schnellsten Zeiten insgesamt</span>
             </div>
-            <button id="toggleChartButton" class="secondary section-action" type="button" aria-expanded="false" aria-controls="chartModal">
-              Diagramm
-            </button>
           </div>
-          <ol class="ranking-list" id="topList"></ol>
+          <div class="chart-panel" id="chartPanel"></div>
         </section>
 
         <section class="stack-section">
@@ -125,16 +123,6 @@
         </section>
       </aside>
     </main>
-
-    <div class="modal" id="chartModal" hidden>
-      <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="chartModalTitle">
-        <div class="modal-header">
-          <h2 id="chartModalTitle">Bestenliste als Diagramm</h2>
-          <button id="closeChartButton" class="secondary modal-close" type="button">Schließen</button>
-        </div>
-        <div class="chart-panel chart-modal-content" id="chartModalContent"></div>
-      </div>
-    </div>
 
     <p class="storage-note">
       Hinweis: Auf GitHub Pages werden neue Ergebnisse im Browser dieses Geräts gespeichert.

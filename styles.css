@@ -473,30 +473,20 @@ button.secondary {
   letter-spacing: 0.02em;
   font-weight: 900;
   text-wrap: balance;
+  min-height: 1em;
 }
 
 .countdown-panel {
-  margin-top: 22px;
-  padding: 22px 18px;
+  margin-top: 18px;
+  padding: 14px 16px;
   border-radius: 24px;
   background: rgba(255, 255, 255, 0.9);
   border: 1px solid rgba(255, 255, 255, 0.74);
   display: grid;
   justify-items: center;
-  gap: 16px;
-  width: min(100%, 560px);
+  gap: 10px;
+  width: min(100%, 320px);
   box-shadow: 0 14px 26px rgba(124, 58, 237, 0.08);
-}
-
-.countdown-panel[data-phase="green"] {
-  background: linear-gradient(145deg, rgba(240, 253, 244, 0.98), rgba(220, 252, 231, 0.94));
-  border-color: rgba(34, 197, 94, 0.28);
-  box-shadow: 0 18px 34px rgba(34, 197, 94, 0.22);
-}
-
-.countdown-panel[data-phase="green"] .traffic-light {
-  background: rgba(220, 252, 231, 0.9);
-  box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.16);
 }
 
 .traffic-light {
@@ -541,14 +531,11 @@ button.secondary {
 
 .traffic-light[data-phase="green"] .traffic-bulb.green {
   background: #34d399;
-  box-shadow:
-    0 0 0 10px rgba(34, 197, 94, 0.16),
-    0 0 28px rgba(52, 211, 153, 0.58);
-  transform: scale(1.22);
+  box-shadow: 0 0 18px rgba(52, 211, 153, 0.42);
 }
 
 .countdown-value {
-  font-size: clamp(2.8rem, 10vw, 5.4rem);
+  font-size: clamp(2rem, 7vw, 3.4rem);
   line-height: 1;
   font-weight: 900;
   letter-spacing: 0.08em;
@@ -556,8 +543,7 @@ button.secondary {
 }
 
 .countdown-panel[data-phase="green"] .countdown-value {
-  color: var(--success);
-  text-shadow: 0 0 18px rgba(34, 197, 94, 0.24);
+  color: transparent;
 }
 
 .answer-board {
@@ -732,93 +718,6 @@ button.secondary {
   gap: 14px;
 }
 
-.chart-modal-content {
-  max-height: min(70vh, 760px);
-  overflow: auto;
-}
-
-body.modal-open {
-  overflow: hidden;
-}
-
-.modal {
-  position: fixed;
-  inset: 0;
-  z-index: 30;
-  display: grid;
-  place-items: center;
-  padding: 20px;
-  background: rgba(32, 48, 74, 0.44);
-  backdrop-filter: blur(10px);
-}
-
-.modal[hidden] {
-  display: none !important;
-}
-
-.modal-dialog {
-  width: min(960px, 100%);
-  max-height: calc(100vh - 40px);
-  overflow: auto;
-  padding: 18px;
-  border-radius: 28px;
-  background: rgba(255, 255, 255, 0.96);
-  border: 1px solid rgba(255, 255, 255, 0.84);
-  box-shadow: 0 30px 80px rgba(32, 48, 74, 0.24);
-}
-
-.modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 14px;
-  flex-wrap: wrap;
-}
-
-.modal-close {
-  white-space: nowrap;
-}
-
-.chart-copy,
-.chart-legend {
-  color: var(--muted);
-}
-
-.chart-copy {
-  line-height: 1.5;
-  font-size: 0.92rem;
-}
-
-.chart-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  font-size: 0.85rem;
-}
-
-.legend-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.legend-chip::before {
-  content: "";
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
-}
-
-.legend-chip.player::before {
-  background: linear-gradient(135deg, #fbbf24, #f59e0b);
-}
-
-.legend-chip.last::before {
-  background: linear-gradient(135deg, #34d399, #60a5fa);
-}
-
 .chart-grid {
   display: grid;
   gap: 12px;
@@ -826,9 +725,11 @@ body.modal-open {
 
 .chart-row {
   display: grid;
-  grid-template-columns: minmax(0, 190px) minmax(0, 1fr) auto;
-  gap: 14px;
-  align-items: center;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 18px;
+  background: var(--panel-soft);
+  border: 1px solid rgba(124, 58, 237, 0.08);
 }
 
 .chart-label {
@@ -836,12 +737,18 @@ body.modal-open {
   gap: 4px;
 }
 
-.chart-rank {
-  font-size: 0.76rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
-  font-weight: 700;
+.chart-title-row {
+  display: flex;
+  align-items: start;
+  gap: 12px;
+  flex: 1;
+}
+
+.chart-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .chart-name {
@@ -866,6 +773,7 @@ body.modal-open {
 .chart-value {
   font-weight: 900;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .section-header h2 {
@@ -1175,9 +1083,14 @@ body.modal-open {
     min-height: 120px;
   }
 
-  .chart-row {
-    grid-template-columns: 1fr;
-    gap: 8px;
+  .chart-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .chart-title-row {
+    width: 100%;
   }
 
   .chart-value {
