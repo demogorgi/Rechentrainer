@@ -144,6 +144,12 @@ function init() {
 
 function bindEvents() {
   window.addEventListener("keydown", handleGlobalKeydown, true);
+  window.addEventListener("storage", (event) => {
+    if (event.key === STORAGE_KEYS.scores || event.key === null) {
+      state.scores = loadScores();
+      render();
+    }
+  });
 
   elements.playerNameInput.addEventListener("input", () => {
     const cleaned = normalizeName(elements.playerNameInput.value, { allowEmpty: true });
@@ -605,6 +611,16 @@ function resetScores() {
     return;
   }
 
+  if (state.mode === "playing" || state.mode === "countdown") {
+    clearTimer();
+    clearCountdown();
+    state.mode = "ready";
+    state.answerBuffer = "";
+    state.feedbackText = "";
+    state.feedbackTone = "";
+  }
+
+  removeStoredScores();
   state.scores = cloneScores(SEEDED_SCORES);
   saveScores(state.scores);
   state.lastResult = null;
@@ -1001,6 +1017,14 @@ function saveScores(scores) {
     localStorage.setItem(STORAGE_KEYS.scores, JSON.stringify(scores));
   } catch {
     // Lokale Speicherung kann in restriktiven Browser-Umgebungen blockiert sein.
+  }
+}
+
+function removeStoredScores() {
+  try {
+    localStorage.removeItem(STORAGE_KEYS.scores);
+  } catch {
+    // Ignorieren.
   }
 }
 
